@@ -108,7 +108,7 @@ export default function DashboardPage() {
             <WaterLevelChart zones={zones} />
             <PressureChart zones={zones} />
           </div>
-          <ZoneGrid zones={waterZones} title="Water Systems — Zones 1–16" defaultFilter="all" />
+          <ZoneGrid zones={waterZones} title="Water Systems — Zones (1-16)" defaultFilter="all" />
         </>
       )}
 
