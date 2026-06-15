@@ -6,4 +6,6 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  // Vite automatically exposes VITE_* variables from .env to import.meta.env
+  // No extra config needed — just ensure your .env file has VITE_ prefixed keys
 })
