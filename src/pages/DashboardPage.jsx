@@ -4,7 +4,9 @@ import SummaryCards from '../components/dashboard/SummaryCards';
 import ZoneGrid from '../components/dashboard/ZoneGrid';
 import EventsLog from '../components/dashboard/EventsLog';
 import { WaterLevelChart, PressureChart } from '../components/dashboard/ZoneCharts';
+import UserManagement from '../components/dashboard/UserManagement';
 import { fetchBuilding, fetchZones, fetchEvents, fetchSummary } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import './DashboardPage.css';
 
 const VIEW_TITLES = {
@@ -12,9 +14,11 @@ const VIEW_TITLES = {
   fire: 'Fire Safety',
   water: 'Water Systems',
   events: 'Events Log',
+  users: 'User Management',
 };
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [activeView, setActiveView] = useState('overview');
   const [building, setBuilding] = useState(null);
   const [zones, setZones] = useState([]);
@@ -82,6 +86,7 @@ export default function DashboardPage() {
       title={VIEW_TITLES[activeView]}
       activeView={activeView}
       onNavigate={setActiveView}
+      userRole={user?.role}
     >
       {activeView === 'overview' && (
         <>
@@ -114,6 +119,10 @@ export default function DashboardPage() {
 
       {activeView === 'events' && (
         <EventsLog events={events} onAcknowledge={handleAcknowledge} />
+      )}
+
+      {activeView === 'users' && user?.role === 'admin' && (
+        <UserManagement />
       )}
     </DashboardLayout>
   );

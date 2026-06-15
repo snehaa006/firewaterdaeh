@@ -15,37 +15,25 @@ const AUTH_TOKEN_KEY = 'fwd_auth_token';
 // ---------------------------------------------------------------------------
 
 export async function login(username, password) {
-  // Fetch the user row; compare bcrypt hash server-side via Supabase RPC, or
-  // do a simple lookup here.  Because we can't compare bcrypt hashes in JS
-  // without importing bcryptjs, we use a Supabase RPC function `check_password`
-  // if available, otherwise fall back to a plain lookup (good enough for a
-  // demo with a known admin account).
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('id, username, email, role, is_active')
-    .ilike('username', username)
-    .eq('is_active', true)
-    .limit(1);
+  // Password is verified server-side using bcrypt via the check_password
+  // Postgres RPC (uses pgcrypto's crypt()). The hash never leaves the DB.
+  const { data, error } = await supabase.rpc('check_password', {
+    p_username: username,
+    p_password: password,
+  });
 
   if (error) throw new Error(error.message);
-  if (!users || users.length === 0) throw new Error('Invalid username or password');
+  if (!data || data.length === 0) throw new Error('Invalid username or password');
 
-  const user = users[0];
+  const user = data[0];
 
-  // ⚠️  For a real production app you MUST verify the password server-side
-  // (e.g. via a Supabase Edge Function or FastAPI endpoint) instead of
-  // trusting the client.  This demo skips that step and accepts any password
-  // for the admin user so you can log in immediately.
-  //
-  // Remove this comment and implement proper auth before going live.
-
-  const fakeToken = `supabase.${btoa(
+  const token = `supabase.${btoa(
     JSON.stringify({ sub: user.username, role: user.role, id: user.id, exp: Date.now() + 8 * 60 * 60 * 1000 })
   )}.sig`;
 
-  localStorage.setItem(AUTH_TOKEN_KEY, fakeToken);
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
   return {
-    token: fakeToken,
+    token,
     user: { username: user.username, role: user.role, email: user.email },
   };
 }
@@ -233,6 +221,46 @@ export async function fetchSummary() {
     Math.round((zones.reduce((sum, z) => sum + z.sensors.pressure, 0) / totalZones) * 100) / 100;
 
   return { totalZones, fireAlarms, faults, offline, avgWaterLevel, avgPressure };
+}
+
+// ---------------------------------------------------------------------------
+// User Management (admin only)
+// ---------------------------------------------------------------------------
+
+export async function fetchUsers() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, username, email, role, is_active, created_at')
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function createUser({ username, email, password, role }) {
+  // Hash the password server-side using pgcrypto via RPC — the plain-text
+  // password never touches the DB directly.
+  const { data, error } = await supabase.rpc('create_user_with_password', {
+    p_username: username,
+    p_email: email,
+    p_password: password,
+    p_role: role,
+  });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function toggleUserActive(userId, isActive) {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ is_active: isActive })
+    .eq('id', userId)
+    .select('id, is_active')
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 // ---------------------------------------------------------------------------
